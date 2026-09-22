@@ -1,8 +1,16 @@
 # FixletBuilder
 
+![FixletBuilder Banner](screenshots/banner.png)
+
 A production-grade GUI & CLI tool for generating HCL BigFix `.bes` fixlet files with registry-aware detection, prefetch downloads, and action script generation.
 
 **Made by K K Shal**
+
+---
+
+## Screenshot
+
+![FixletBuilder GUI](screenshots/screenshot.png)
 
 ---
 
