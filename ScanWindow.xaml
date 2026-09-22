@@ -1,0 +1,129 @@
+<Window x:Class="FixletBuilder.ScanWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Scan Installed Apps &amp; Auto-Generate Fixlets"
+        Width="1100" Height="720"
+        MinWidth="860" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Segoe UI" FontSize="13">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                <Button x:Name="ScanBtn" Content="Scan Installed Apps" Padding="14,5" Click="ScanBtn_Click"/>
+                <Button x:Name="FetchWingetBtn" Content="Fetch from Winget" Padding="14,5" Margin="8,0,0,0" Click="FetchWingetBtn_Click" ToolTip="Search winget for app metadata"/>
+                <Button x:Name="CheckUpdatesBtn" Content="Check for Updates" Padding="14,5" Margin="8,0,0,0" Click="CheckUpdatesBtn_Click" ToolTip="Check winget for available upgrades"/>
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <TextBlock x:Name="WingetStatus" Text="" VerticalAlignment="Center" Foreground="#F58220" FontSize="11" Margin="0,0,12,0"/>
+                <TextBlock x:Name="ScanStatus" Text="Ready" VerticalAlignment="Center" Foreground="#9E9E9E"/>
+            </StackPanel>
+        </DockPanel>
+
+        <Grid Grid.Row="1" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="180"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="120"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="Filter:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox x:Name="FilterBox" Grid.Column="1" Margin="0,0,8,0" TextChanged="FilterBox_TextChanged"/>
+
+            <TextBlock Grid.Column="2" Text="Type:" VerticalAlignment="Center" Margin="8,0,6,0"/>
+            <ComboBox x:Name="TypeCombo" Grid.Column="3" Width="140" HorizontalAlignment="Left"/>
+
+            <TextBlock Grid.Column="4" Text="Output:" VerticalAlignment="Center" Margin="8,0,6,0"/>
+            <Grid Grid.Column="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="OutputBox" Grid.Column="0" Text="./fixlet-output"/>
+                <Button Grid.Column="1" Content="..." Padding="6,2" Margin="4,0,0,0" Click="BrowseOutput_Click"/>
+            </Grid>
+
+            <TextBlock Grid.Column="6" Text="Kill process:" VerticalAlignment="Center" Margin="8,0,6,0"
+                       ToolTip="Process name to kill before install (e.g. notepad)"/>
+            <TextBox x:Name="ProcessNameBox" Grid.Column="7" Margin="0,0,4,0"
+                     ToolTip="Process name to kill before install"/>
+
+            <TextBlock Grid.Column="8" Text="Stop service:" VerticalAlignment="Center" Margin="8,0,6,0"
+                       ToolTip="Service name to stop before install (e.g. W3SVC)"/>
+            <TextBox x:Name="ServiceNameBox" Grid.Column="9" Margin="0,0,0,0"
+                     ToolTip="Service name to stop before install"/>
+        </Grid>
+
+        <TabControl Grid.Row="2" Margin="0,8,0,0">
+            <TabItem Header="Installed Apps">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <CheckBox x:Name="SelectAllCheck" Grid.Row="0" Content="Select All" Margin="4,4" Click="SelectAll_Click"/>
+                    <DataGrid x:Name="AppsGrid" Grid.Row="1" IsReadOnly="False" AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Extended"
+                              HeadersVisibility="All" GridLinesVisibility="Horizontal">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="Select" Binding="{Binding IsSelected, Mode=TwoWay}" Width="60"/>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="220" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="100" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="160" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Install Location" Binding="{Binding InstallLocation}" Width="280" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Winget ID" Binding="{Binding WingetId}" Width="160" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="60" IsReadOnly="True"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Updates Available">
+                <DataGrid x:Name="UpdatesGrid" IsReadOnly="True" AutoGenerateColumns="False"
+                          CanUserAddRows="False" HeadersVisibility="All" GridLinesVisibility="Horizontal">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="App Name" Binding="{Binding AppName}" Width="220"/>
+                        <DataGridTextColumn Header="Installed" Binding="{Binding InstalledVersion}" Width="120"/>
+                        <DataGridTextColumn Header="Available" Binding="{Binding LatestVersion}" Width="120"/>
+                        <DataGridTextColumn Header="Package ID" Binding="{Binding PackageId}" Width="200"/>
+                        <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="80"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+            <TabItem Header="Generation Log">
+                <ListBox x:Name="LogList" FontFamily="Consolas" FontSize="11"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock x:Name="CountsText" Text="0 selected" VerticalAlignment="Center" Foreground="#9E9E9E" FontSize="11"/>
+        </StackPanel>
+
+        <DockPanel Grid.Row="4" Margin="0,6,0,0">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                <Button x:Name="GenerateBtn" Content="Generate Selected Fixlets" Padding="16,6"
+                        IsEnabled="False" Click="GenerateBtn_Click"/>
+                <Button x:Name="GenerateAllBtn" Content="Generate All Visible" Padding="16,6" Margin="8,0,0,0"
+                        IsEnabled="False" Click="GenerateAllBtn_Click"/>
+                <Button x:Name="MonitorBtn" Content="Start Monitoring" Padding="16,6" Margin="8,0,0,0"
+                        Click="MonitorBtn_Click" ToolTip="Add selected apps to version monitor"/>
+            </StackPanel>
+            <TextBlock x:Name="StatusText" DockPanel.Dock="Right" VerticalAlignment="Center" TextAlignment="Right"
+                       TextWrapping="Wrap" Foreground="#9E9E9E"/>
+        </DockPanel>
+    </Grid>
+</Window>

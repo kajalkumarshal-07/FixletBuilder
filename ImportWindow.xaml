@@ -1,0 +1,100 @@
+<Window x:Class="FixletBuilder.ImportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Batch Import &amp; Monitor - Create Fixlets from CSV / Excel"
+        Width="1050" Height="680"
+        MinWidth="760" MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Segoe UI" FontSize="13"
+        AllowDrop="True"
+        DragOver="Window_DragOver"
+        Drop="Window_Drop">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0">
+            <Button DockPanel.Dock="Left" x:Name="LoadBtn" Content="Load CSV / Excel..." Padding="12,5" Click="LoadBtn_Click"/>
+            <TextBlock x:Name="FileLabel" DockPanel.Dock="Left" Text="No file loaded - drag &amp; drop or click Load" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#9E9E9E"/>
+            <TextBlock DockPanel.Dock="Right" TextWrapping="Wrap" MaxWidth="430" Foreground="#9E9E9E" FontSize="11"
+                       Text="Expected columns: Title, AppName, Version, SourceURL, SilentArgs, InstallPath, UninstallString, SuccessCriteria, Relevance, Description, Type, Category, Source, SourceID, Domain, DownloadSize."/>
+        </DockPanel>
+
+        <Grid Grid.Row="1" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="90"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="Output folder:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
+            <TextBox x:Name="OutputFolderBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,0"/>
+            <Button Grid.Row="0" Grid.Column="2" x:Name="BrowseBtn" Content="Browse..." Padding="10,4" Click="BrowseBtn_Click"/>
+
+            <TextBlock Text="Fixlet type:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,8,0,0"/>
+            <ComboBox x:Name="TypeCombo" Grid.Row="1" Grid.Column="1" Margin="0,8,8,0" Width="240" HorizontalAlignment="Left"/>
+        </Grid>
+
+        <TabControl Grid.Row="2" Margin="0,10,0,0">
+            <TabItem Header="Data preview">
+                <DataGrid x:Name="PreviewGrid" IsReadOnly="True" AutoGenerateColumns="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          HeadersVisibility="All" GridLinesVisibility="Horizontal"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+            </TabItem>
+            <TabItem Header="Issues &amp; warnings">
+                <ListBox x:Name="IssuesList" FontFamily="Consolas" FontSize="12"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+            </TabItem>
+            <TabItem Header="Version Monitor">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Name="MonitorCheckBtn" Content="Check for Updates" Padding="14,5" Click="MonitorCheckBtn_Click"/>
+                        <Button x:Name="MonitorGenerateBtn" Content="Generate Upgrade Fixlets" Padding="14,5" Margin="8,0,0,0"
+                                IsEnabled="False" Click="MonitorGenerateBtn_Click"/>
+                        <Button x:Name="MonitorExportCsvBtn" Content="Export CSV" Padding="14,5" Margin="8,0,0,0"
+                                IsEnabled="False" Click="MonitorExportCsvBtn_Click"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock x:Name="MonitorStatus" Text="Add apps to the monitor list via the Scan window, or click Check to scan all." Foreground="#9E9E9E" FontSize="11"/>
+                    </StackPanel>
+
+                    <DataGrid x:Name="MonitorGrid" Grid.Row="2" IsReadOnly="True" AutoGenerateColumns="False"
+                              CanUserAddRows="False" HeadersVisibility="All" GridLinesVisibility="Horizontal">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="Update?" Binding="{Binding UpdateAvailable}" Width="70"/>
+                            <DataGridTextColumn Header="App Name" Binding="{Binding AppName}" Width="200"/>
+                            <DataGridTextColumn Header="Installed" Binding="{Binding InstalledVersion}" Width="120"/>
+                            <DataGridTextColumn Header="Available" Binding="{Binding LatestVersion}" Width="120"/>
+                            <DataGridTextColumn Header="Package ID" Binding="{Binding PackageId}" Width="200"/>
+                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="80"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <DockPanel Grid.Row="3" Margin="0,10,0,0">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                <Button x:Name="GenerateBtn" Content="Generate .bes Files" Padding="16,6" IsEnabled="False" Click="GenerateBtn_Click"/>
+                <Button x:Name="OpenFolderBtn" Content="Open Output Folder" Padding="16,6" Margin="8,0,0,0" IsEnabled="False" Click="OpenFolderBtn_Click"/>
+            </StackPanel>
+            <TextBlock x:Name="StatusText" DockPanel.Dock="Right" VerticalAlignment="Center" TextAlignment="Right" TextWrapping="Wrap" Foreground="#9E9E9E"/>
+        </DockPanel>
+    </Grid>
+</Window>
