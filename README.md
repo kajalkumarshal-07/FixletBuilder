@@ -8,12 +8,6 @@ A production-grade GUI & CLI tool for generating HCL BigFix `.bes` fixlet files 
 
 ---
 
-## Screenshot
-
-![FixletBuilder GUI](screenshots/screenshot.png)
-
----
-
 ## Features
 
 ### Core
