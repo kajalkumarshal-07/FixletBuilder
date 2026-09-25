@@ -235,24 +235,30 @@
             <Setter Property="BorderBrush" Value="{StaticResource InputBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="RowBackground" Value="{StaticResource PanelBg}"/>
-            <Setter Property="AlternatingRowBackground" Value="#F8F8F8"/>
+            <Setter Property="AlternatingRowBackground" Value="#EEF5FB"/>
             <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource GridLine}"/>
             <Setter Property="VerticalGridLinesBrush" Value="{StaticResource GridLine}"/>
             <Setter Property="GridLinesVisibility" Value="Horizontal"/>
             <Setter Property="HeadersVisibility" Value="All"/>
+            <Setter Property="RowHeaderWidth" Value="0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="AutoGenerateColumns" Value="False"/>
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="{StaticResource HeaderBg}"/>
             <Setter Property="Foreground" Value="{StaticResource Fg}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Padding" Value="10,8"/>
             <Setter Property="BorderBrush" Value="{StaticResource InputBorder}"/>
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
         </Style>
 
         <Style TargetType="DataGridRow">
             <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="MinHeight" Value="32"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{StaticResource HoverBg}"/>
@@ -267,10 +273,12 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{StaticResource Fg}"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Background" Value="{StaticResource Selection}"/>
+                    <Setter Property="Foreground" Value="{StaticResource Fg}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>

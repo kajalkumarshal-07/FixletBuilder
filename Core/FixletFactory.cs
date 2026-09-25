@@ -11,9 +11,9 @@ public static class FixletFactory
         new[] { "appname", "application", "app", "software", "name" },
         new[] { "version" },
         new[] { "sourceurl", "downloadurl", "url", "download", "installerurl" },
-        new[] { "silentargs", "silent", "parameters", "commandline", "flags" },
-        new[] { "installpath", "targetpath", "exe", "file" },
-        new[] { "uninstallstring", "uninstall" },
+        new[] { "silentargs", "silent", "parameters", "commandline", "flags", "silent_args" },
+        new[] { "installpath", "targetpath", "exe", "file", "install_path" },
+        new[] { "uninstallstring", "uninstall", "uninstall_string" },
         new[] { "relevance", "relevanceexpression" },
         new[] { "successcriteria", "success" },
         new[] { "description", "notes" },
@@ -26,9 +26,11 @@ public static class FixletFactory
         new[] { "sha1", "hash", "sha1hash", "sha 1" },
         new[] { "sha256", "sha256hash", "sha 256", "hash256" },
         new[] { "filesize", "filesizebytes", "sizebytes", "size bytes" },
-        new[] { "registrykey", "regkey", "registrykeypath", "regkeypath" },
-        new[] { "registryvaluename", "regvaluename", "regvalname", "valname" },
-        new[] { "registryvalue", "regvalue", "regval", "regvaldata" }
+        new[] { "registrykey", "regkey", "registrykeypath", "regkeypath", "registry_key" },
+        new[] { "registryvaluename", "regvaluename", "regvalname", "valname", "registry_value_name" },
+        new[] { "registryvalue", "regvalue", "regval", "regvaldata", "registry_value" },
+        new[] { "detection", "detectionmethod", "detection_method" },
+        new[] { "msiproductcode", "productcode", "msi", "msi code", "msi_product_code" }
     };
 
     public static Dictionary<string, int> BuildColumnMap(string[] headers)
@@ -77,7 +79,8 @@ public static class FixletFactory
         return FixletTemplates.TypeInstall;
     }
 
-    public static FixletModel Build(string[] row, Dictionary<string, int> map, string? forcedType, out List<string> issues)
+    public static FixletModel Build(string[] row, Dictionary<string, int> map, string? forcedType, out List<string> issues,
+        DetectionMethod fallbackMethod = DetectionMethod.Auto)
     {
         issues = new List<string>();
         if (row is null) throw new ArgumentNullException(nameof(row));
@@ -107,17 +110,26 @@ public static class FixletFactory
         var template = FixletTemplates.Apply(type, appName, version, sourceUrl, silentArgs, installPath, uninstallString,
             sha1: sha1, sha256: sha256, fileSizeBytes: fileSizeBytes);
 
-        var relevance = RelevanceBuilder.BuildForInstall(installPath, appName, version,
-            registryKeyPath, registryValueName, registryValue);
-        if (type == "upgrade")
-            relevance = RelevanceBuilder.BuildForUpgrade(installPath, appName, version, version,
-                registryKeyPath, registryValueName, registryValue);
-        else if (type == "uninstall")
-            relevance = RelevanceBuilder.BuildForUninstall(installPath, appName, uninstallString,
-                registryKeyPath, registryValueName, registryValue);
+        var detectionRaw = GetByAliasGroup(row, map, "detection");
+        var method = detectionRaw.Length > 0 ? DetectionMethods.Parse(detectionRaw) : fallbackMethod;
+        var msiProductCode = GetByAliasGroup(row, map, "msiproductcode");
 
-        var successCriteria = RelevanceBuilder.BuildSuccessCriteria(installPath, type, version,
-            registryKeyPath, registryValueName);
+        var detection = RelevanceBuilder.BuildDetection(new DetectionInput
+        {
+            Type = type,
+            Method = method,
+            AppName = appName,
+            Version = version,
+            InstallPath = installPath,
+            RegistryKeyPath = registryKeyPath,
+            RegistryValueName = registryValueName,
+            RegistryValue = registryValue,
+            MsiProductCode = msiProductCode
+        });
+        var relevance = detection.Relevance;
+        var successCriteria = detection.SuccessCriteria;
+        if (detection.Warning is not null)
+            issues.Add($"'{(appName.Length > 0 ? appName : "row")}': {detection.Warning}");
 
         var model = new FixletModel
         {

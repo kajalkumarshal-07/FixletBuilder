@@ -309,8 +309,7 @@ public partial class ScanWindow : Window
                     Description = template.Description,
                     ActionDescription = template.ActionDescription,
                     ActionScript = template.ActionScript,
-                    SuccessCriteria = RelevanceBuilder.BuildSuccessCriteria(app.InstallLocation, type, app.Version,
-                        registryKeyPath, registryValueName),
+                    SuccessCriteria = RelevanceBuilder.BuildSuccessCriteriaFromInstalledApp(app, type),
                     RegistryKeyPath = registryKeyPath,
                     RegistryValueName = registryValueName,
                     RegistryValue = registryValue

@@ -18,6 +18,8 @@ public class InstalledApp
     public string RegistryKeyPath { get; set; } = "";
     public string RegistryValueName { get; set; } = "DisplayVersion";
     public string RegistryValue { get; set; } = "";
+    /// <summary>MSI product code ({GUID}) when the Uninstall key is an MSI product key.</summary>
+    public string MsiProductCode { get; set; } = "";
 }
 
 public sealed class InstalledAppsScanner : IInstalledAppsScanner
@@ -30,7 +32,8 @@ public sealed class InstalledAppsScanner : IInstalledAppsScanner
 
     public List<InstalledApp> Scan() => ScanAsync().GetAwaiter().GetResult();
 
-    public async Task<List<InstalledApp>> ScanAsync(IProgress<int>? progress = null, CancellationToken ct = default)
+    public async Task<List<InstalledApp>> ScanAsync(IProgress<int>? progress = null, CancellationToken ct = default,
+        bool enrichWithWinget = true)
     {
         return await Task.Run(() =>
         {
@@ -47,8 +50,11 @@ public sealed class InstalledAppsScanner : IInstalledAppsScanner
                 progress?.Report(++step * 100 / totalSteps);
             }
 
-            EnrichWithWinget(enrichedDict, ct);
-            progress?.Report(++step * 100 / totalSteps);
+            if (enrichWithWinget)
+            {
+                EnrichWithWinget(enrichedDict, ct);
+                progress?.Report(++step * 100 / totalSteps);
+            }
 
             return enrichedDict.Values
                 .Where(a => !string.IsNullOrWhiteSpace(a.Name))
@@ -99,7 +105,8 @@ public sealed class InstalledAppsScanner : IInstalledAppsScanner
                         Source = root == Registry.LocalMachine ? "HKLM" : "HKCU",
                         RegistryKeyPath = $@"{root.Name.Replace("HKEY_LOCAL_MACHINE", "HKLM").Replace("HKEY_CURRENT_USER", "HKCU")}\{keyPath}\{subKeyName}",
                         RegistryValueName = "DisplayVersion",
-                        RegistryValue = regVersion
+                        RegistryValue = regVersion,
+                        MsiProductCode = LooksLikeProductCode(subKeyName) ? subKeyName : ""
                     };
                 }
                 catch
@@ -112,6 +119,14 @@ public sealed class InstalledAppsScanner : IInstalledAppsScanner
         {
             // Skip keys we can't open
         }
+    }
+
+    /// <summary>Uninstall subkey names that are MSI product codes look like {GUID}.</summary>
+    private static bool LooksLikeProductCode(string keyName)
+    {
+        if (string.IsNullOrWhiteSpace(keyName) || keyName.Length != 38) return false;
+        if (keyName[0] != '{' || keyName[^1] != '}') return false;
+        return System.Guid.TryParse(keyName, out _);
     }
 
     private static void EnrichWithWinget(Dictionary<string, InstalledApp> apps, CancellationToken ct)

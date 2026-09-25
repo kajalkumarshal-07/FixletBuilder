@@ -1,12 +1,13 @@
-﻿<Window x:Class="FixletBuilder.MainWindow"
+<Window x:Class="FixletBuilder.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Fixlet Builder - BigFix Fixlet Creator"
-        Width="1280" Height="900"
-        MinWidth="960" MinHeight="640"
+        Width="1280" Height="820"
+        MinWidth="900" MinHeight="520"
         Icon="Resources/app.ico"
         WindowStartupLocation="CenterScreen"
         FontFamily="Segoe UI" FontSize="13"
+        Loaded="Window_Loaded"
         PreviewKeyDown="Window_PreviewKeyDown"
         Closing="Window_Closing">
     <Grid Margin="12">
@@ -17,7 +18,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <DockPanel Grid.Row="0">
+        <DockPanel x:Name="FixletToolbar" Grid.Row="0">
             <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
                 <TextBlock Text="Fixlet type:" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <ComboBox x:Name="TypeCombo" Width="130" VerticalContentAlignment="Center"/>
@@ -28,8 +29,11 @@
                 <Button x:Name="ScanAppsBtn" Content="Scan Installed Apps" Margin="8,0,0,0" Padding="12,4" Click="ScanAppsBtn_Click" ToolTip="Scan this machine and auto-generate fixlets"/>
                 <Button x:Name="CheckUpdatesBtn" Content="Check Updates" Margin="8,0,0,0" Padding="12,4" Click="CheckUpdatesBtn_Click" ToolTip="Check winget for available upgrades"/>
                 <Separator Background="#CCCCCC" Width="1" Margin="8,2" />
-                <Button x:Name="AutoFetchBtn" Content="Auto-Fetch" Margin="8,0,0,0" Padding="12,4" Click="AutoFetchBtn_Click" ToolTip="Auto-fill metadata from winget for current app name"/>
-                <Button x:Name="FetchHashesBtn" Content="Fetch Hashes" Margin="8,0,0,0" Padding="12,4" Click="FetchHashesBtn_Click" ToolTip="Download installer and compute SHA1, SHA256, and file size"/>
+                <Button x:Name="AutoFetchBtn" Content="Auto-Fetch (winget)" Margin="8,0,0,0" Padding="10,4" Click="AutoFetchBtn_Click"
+                        ToolTip="Pull app name, version, installer URL, silent args and install path from the winget catalog"/>
+                <Button x:Name="LocalDetectBtn" Content="Detect on this PC" Margin="6,0,0,0" Padding="10,4" Click="LocalDetectBtn_Click"
+                        ToolTip="Read the app from this machine's Uninstall registry: version, install path, uninstall string, registry key, MSI product code"/>
+                <Button x:Name="FetchHashesBtn" Content="Fetch Hashes" Margin="6,0,0,0" Padding="10,4" Click="FetchHashesBtn_Click" ToolTip="Download installer and compute SHA1, SHA256, and file size"/>
                 <Separator Background="#CCCCCC" Width="1" Margin="8,2" />
                 <Button x:Name="ValidateBtn" Content="Validate" Margin="16,0,0,0" Padding="16,4" Click="ValidateBtn_Click"/>
                 <Button x:Name="SaveBtn" Content="Save As .bes..." Margin="8,0,0,0" Padding="16,4" Click="SaveBtn_Click" ToolTip="Save this fixlet (Ctrl+S)"/>
@@ -38,7 +42,7 @@
                        VerticalAlignment="Center" Foreground="#666666" FontSize="11"/>
         </DockPanel>
 
-        <Grid Grid.Row="1" Margin="0,8,0,0">
+        <Grid x:Name="FixletMetaPanel" Grid.Row="1" Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="8"/>
@@ -52,6 +56,7 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -107,6 +112,11 @@
                                ToolTip="Service name to stop before install (e.g. W3SVC)"/>
                     <TextBox x:Name="ServiceNameBox" Grid.Row="10" Grid.Column="1" Margin="0,2"
                              ToolTip="Service name to stop before install (leave empty to skip)"/>
+
+                    <TextBlock Text="MSI product code:" Grid.Row="11" Grid.Column="0" VerticalAlignment="Center"
+                               ToolTip="Windows Installer product code {GUID} - most reliable detection method"/>
+                    <TextBox x:Name="MsiCodeBox" Grid.Row="11" Grid.Column="1" Margin="0,2" FontFamily="Consolas" FontSize="11"
+                             ToolTip="MSI product code, e.g. {23170F69-40C1-2702-2500-000001000000} - used by the MSI Product Code detection method"/>
                 </Grid>
             </GroupBox>
 
@@ -161,47 +171,154 @@
             </GroupBox>
         </Grid>
 
-        <TabControl x:Name="MainTabControl" Grid.Row="2" Margin="0,8,0,0">
+        <TabControl x:Name="MainTabControl" Grid.Row="2" Margin="0,8,0,0"
+                    SelectionChanged="MainTabControl_SelectionChanged">
             <TabItem Header="Relevance">
-                <TextBox x:Name="RelevanceBox" AcceptsReturn="True" TextWrapping="Wrap"
-                         FontFamily="Consolas" FontSize="12" Padding="4" VerticalScrollBarVisibility="Auto"
-                         ToolTip="One relevance expression per line. The fixlet is relevant when all expressions evaluate true."/>
-            </TabItem>
-            <TabItem Header="Description (HTML)">
-                <TextBox x:Name="DescriptionBox" AcceptsReturn="True" TextWrapping="Wrap"
-                         FontFamily="Consolas" FontSize="12" Padding="4" VerticalScrollBarVisibility="Auto"/>
-            </TabItem>
-            <TabItem Header="Action script">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <WrapPanel Grid.Row="0" Background="#F0F0F0" Margin="6,4,6,4">
-                        <TextBlock Text="Quick Insert:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0"/>
-                        <Button Content="Kill Process" Padding="8,3" Margin="2" Click="SnippetKillProcess_Click" ToolTip="Insert: waithidden powershell Stop-Process"/>
-                        <Button Content="Stop Service" Padding="8,3" Margin="2" Click="SnippetStopService_Click" ToolTip="Insert: waithidden sc stop"/>
-                        <Button Content="Delete File" Padding="8,3" Margin="2" Click="SnippetDeleteFile_Click" ToolTip="Insert: delete file"/>
-                        <Button Content="Delete Folder" Padding="8,3" Margin="2" Click="SnippetDeleteFolder_Click" ToolTip="Insert: folder delete"/>
-                        <Button Content="Copy File" Padding="8,3" Margin="2" Click="SnippetCopyFile_Click" ToolTip="Insert: copy source dest"/>
-                        <Button Content="Move File" Padding="8,3" Margin="2" Click="SnippetMoveFile_Click" ToolTip="Insert: move source dest"/>
-                        <Button Content="Create Folder" Padding="8,3" Margin="2" Click="SnippetCreateFolder_Click" ToolTip="Insert: folder create"/>
-                        <Button Content="Set Registry" Padding="8,3" Margin="2" Click="SnippetSetRegistry_Click" ToolTip="Insert: regset key name=value"/>
-                        <Button Content="Set Reg 64" Padding="8,3" Margin="2" Click="SnippetSetRegistry64_Click" ToolTip="Insert: regset64 key name=value"/>
-                        <Button Content="Delete Reg Value" Padding="8,3" Margin="2" Click="SnippetDeleteRegistry_Click" ToolTip="Insert: regdelete key name"/>
-                        <Button Content="Delete Reg Key" Padding="8,3" Margin="2" Click="SnippetDeleteRegistryKey_Click" ToolTip="Insert: regkeydelete key"/>
-                        <Button Content="Restart" Padding="8,3" Margin="2" Click="SnippetRestart_Click" ToolTip="Insert: restart"/>
-                        <Button Content="Shutdown" Padding="8,3" Margin="2" Click="SnippetShutdown_Click" ToolTip="Insert: shutdown"/>
-                        <Button Content="Restart BES" Padding="8,3" Margin="2" Click="SnippetClientRestart_Click" ToolTip="Insert: client restart (must be last)"/>
-                        <Button Content="Force Refresh" Padding="8,3" Margin="2" Click="SnippetForceRefresh_Click" ToolTip="Insert: notify client ForceRefresh"/>
-                        <Button Content="Continue If" Padding="8,3" Margin="2" Click="SnippetContinueIf_Click" ToolTip="Insert: continue if {relevance}"/>
-                        <Button Content="Pause While" Padding="8,3" Margin="2" Click="SnippetPauseWhile_Click" ToolTip="Insert: pause while {relevance}"/>
-                        <Button Content="Action Restart" Padding="8,3" Margin="2" Click="SnippetActionRestart_Click" ToolTip="Insert: action requires restart"/>
-                        <Button Content="Create Config" Padding="8,3" Margin="2" Click="SnippetCreateConfig_Click" ToolTip="Insert: createfile until + move"/>
-                        <Button Content="Append File" Padding="8,3" Margin="2" Click="SnippetAppendFile_Click" ToolTip="Insert: appendfile + move"/>
-                    </WrapPanel>
-                    <TextBox x:Name="ActionScriptBox" Grid.Row="1" AcceptsReturn="True" TextWrapping="NoWrap"
-                             FontFamily="Consolas" FontSize="12" Padding="4" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+
+                    <!-- Detection method picker -->
+                    <Border Grid.Row="0" Background="#F5F7FA" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Padding="8,6">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Detection method:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <RadioButton x:Name="DetAutoRadio" GroupName="DetectionMethod" Content="Auto" Checked="DetMethod_Changed" IsChecked="True"
+                                             VerticalAlignment="Center" Margin="0,0,10,0"
+                                             ToolTip="Priority: MSI Product Code > EXE File Version > Registry Key + DisplayVersion > DisplayName Contains > File/Folder Exists"/>
+                                <RadioButton x:Name="DetMsiRadio" GroupName="DetectionMethod" Content="MSI Product Code" Checked="DetMethod_Changed"
+                                             VerticalAlignment="Center" Margin="0,0,10,0"
+                                             ToolTip="not exists product &quot;{GUID}&quot; of windows installer - vendor key names cannot change"/>
+                                <RadioButton x:Name="DetFileRadio" GroupName="DetectionMethod" Content="EXE File Version" Checked="DetMethod_Changed"
+                                             VerticalAlignment="Center" Margin="0,0,10,0"
+                                             ToolTip="file &quot;app.exe&quot; whose (version of it &gt;= required) of folder ... of program files folder"/>
+                                <RadioButton x:Name="DetRegRadio" GroupName="DetectionMethod" Content="Registry Key + DisplayVersion" Checked="DetMethod_Changed"
+                                             VerticalAlignment="Center" Margin="0,0,10,0"
+                                             ToolTip="Uninstall key, DisplayVersion compared as version via native registry"/>
+                                <RadioButton x:Name="DetNameRadio" GroupName="DetectionMethod" Content="DisplayName Contains" Checked="DetMethod_Changed"
+                                             VerticalAlignment="Center" Margin="0,0,10,0"
+                                             ToolTip="Fallback when the uninstall key name varies - searches HKLM/HKCU Uninstall (64 + WOW6432Node)"/>
+                                <RadioButton x:Name="DetPathRadio" GroupName="DetectionMethod" Content="File / Folder Exists" Checked="DetMethod_Changed"
+                                             VerticalAlignment="Center" Margin="0,0,4,0"
+                                             ToolTip="Simplest check - the install folder or executable exists (no version compare)"/>
+                                <Button x:Name="GenerateRelevanceBtn" Content="Generate Relevance" Padding="12,4" Margin="14,0,0,0"
+                                        FontWeight="SemiBold" Click="GenerateRelevanceBtn_Click"
+                                        ToolTip="Regenerate the relevance lines below (and the success criteria) using the selected detection method"/>
+                                <Button Content="Not installed OR older" Padding="10,4" Margin="6,0,0,0"
+                                        Click="InsertNotInstalledOrOlderBtn_Click"
+                                        ToolTip="Insert the combined pattern for the current app/version as an extra relevance line"/>
+                            </StackPanel>
+                            <TextBlock x:Name="DetHintText" Margin="0,5,0,0" Foreground="#555555" FontSize="11" TextWrapping="Wrap"
+                                       Text="Priority: MSI Product Code → EXE File Version → Registry Key + DisplayVersion → DisplayName Contains → File/Folder Exists. Install/upgrade relevance = not installed OR installed below the required version."/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBox x:Name="RelevanceBox" Grid.Row="1" AcceptsReturn="True" TextWrapping="Wrap"
+                             FontFamily="Consolas" FontSize="12" Padding="4" VerticalScrollBarVisibility="Auto"
+                             ToolTip="One relevance expression per line. The fixlet is relevant when all expressions evaluate true."/>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Description (HTML)">
+                <TextBox x:Name="DescriptionBox" AcceptsReturn="True" TextWrapping="Wrap"
+                         FontFamily="Consolas" FontSize="12" Padding="4" VerticalScrollBarVisibility="Auto"/>
+            </TabItem>
+            <TabItem Header="Action Builder">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="180"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Button palette -->
+                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" MaxHeight="170">
+                        <StackPanel Margin="6,4,6,4">
+                            <WrapPanel Background="#F0F0F0" Margin="0,0,0,4" >
+                                <TextBlock Text="Download:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,6,0"/>
+                                <Button Content="Add Download (prefetch)" Padding="8,3" Margin="2" Click="StepDownload_Click"
+                                        ToolTip="Auto-uses Installer URL, SHA1, SHA256, size from the form"/>
+                            </WrapPanel>
+                            <WrapPanel Background="#E8F5E9" Margin="0,0,0,4" >
+                                <TextBlock Text="Pre-install:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,6,0"/>
+                                <Button Content="Kill Process" Padding="8,3" Margin="2" Click="StepKill_Click"/>
+                                <Button Content="Stop Service" Padding="8,3" Margin="2" Click="StepStop_Click"/>
+                                <Button Content="Delete File" Padding="8,3" Margin="2" Click="StepDeleteFile_Click"/>
+                                <Button Content="Delete Folder" Padding="8,3" Margin="2" Click="StepDeleteFolder_Click"/>
+                                <Button Content="Copy File" Padding="8,3" Margin="2" Click="StepCopy_Click"/>
+                                <Button Content="Move File" Padding="8,3" Margin="2" Click="StepMove_Click"/>
+                                <Button Content="Create Folder" Padding="8,3" Margin="2" Click="StepMkdir_Click"/>
+                                <Button Content="Set Registry" Padding="8,3" Margin="2" Click="StepRegset_Click"/>
+                                <Button Content="Set Reg 64" Padding="8,3" Margin="2" Click="StepRegset64_Click"/>
+                                <Button Content="Delete Reg Value" Padding="8,3" Margin="2" Click="StepRegdelete_Click"/>
+                                <Button Content="Delete Reg Key" Padding="8,3" Margin="2" Click="StepRegkeydelete_Click"/>
+                                <Button Content="Create Config" Padding="8,3" Margin="2" Click="StepCreateConfig_Click"/>
+                                <Button Content="Append File" Padding="8,3" Margin="2" Click="StepAppendFile_Click"/>
+                            </WrapPanel>
+                            <WrapPanel Background="#E3F2FD" Margin="0,0,0,4" >
+                                <TextBlock Text="Install / Uninstall:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,6,0"/>
+                                <Button Content="Install MSI (silent)" Padding="8,3" Margin="2" Click="StepInstallMsi_Click"
+                                        ToolTip="waithidden msiexec.exe /i &quot;{pathname of download file ...}&quot; /qn"/>
+                                <Button Content="Install EXE (silent)" Padding="8,3" Margin="2" Click="StepInstallExe_Click"
+                                        ToolTip="Runs the downloaded installer with silent args"/>
+                                <Button Content="Install Local File" Padding="8,3" Margin="2" Click="StepInstallLocal_Click"
+                                        ToolTip="Install from Install path field (no download)"/>
+                                <Button Content="Run Uninstall" Padding="8,3" Margin="2" Click="StepUninstall_Click"
+                                        ToolTip="Uses Uninstall string field"/>
+                                <Button Content="Run Command" Padding="8,3" Margin="2" Click="StepRun_Click"/>
+                                <Button Content="Wait Command" Padding="8,3" Margin="2" Click="StepWait_Click"/>
+                            </WrapPanel>
+                            <WrapPanel Background="#FFF3E0" Margin="0,0,0,4" >
+                                <TextBlock Text="Post-install / Flow:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,6,0"/>
+                                <Button Content="Restart (delay)" Padding="8,3" Margin="2" Click="StepRestart_Click"/>
+                                <Button Content="Shutdown (delay)" Padding="8,3" Margin="2" Click="StepShutdown_Click"/>
+                                <Button Content="Action Restart" Padding="8,3" Margin="2" Click="StepActionRestart_Click"/>
+                                <Button Content="Client Restart" Padding="8,3" Margin="2" Click="StepClientRestart_Click"
+                                        ToolTip="Must be the LAST command in the action script"/>
+                                <Button Content="Force Refresh" Padding="8,3" Margin="2" Click="StepForceRefresh_Click"/>
+                                <Button Content="Continue If" Padding="8,3" Margin="2" Click="StepContinueIf_Click"/>
+                                <Button Content="Pause While" Padding="8,3" Margin="2" Click="StepPauseWhile_Click"/>
+                                <Button Content="Custom Line" Padding="8,3" Margin="2" Click="StepCustom_Click"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Steps list -->
+                    <GroupBox Grid.Row="1" Header="Action steps (in order - script auto-generated below)" Margin="6,4,6,4">
+                        <Grid>
+                            <ListBox x:Name="StepsList" FontFamily="Consolas" FontSize="12"
+                                     SelectionMode="Single" MouseDoubleClick="StepsList_MouseDoubleClick"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                            <TextBlock x:Name="StepsEmptyHint"
+                                       Text="No steps yet. Use the buttons above to build the action script,&#x0a;or click 'Apply Template' for a sensible default for the selected fixlet type."
+                                       TextWrapping="Wrap" Foreground="#999999" Margin="12" VerticalAlignment="Center"
+                                       IsHitTestVisible="False"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Step controls -->
+                    <DockPanel Grid.Row="2" Margin="6,0,6,0">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                            <Button Content="Remove Step" Padding="10,4" Margin="0,0,6,0" Click="StepRemove_Click"/>
+                            <Button Content="Move Up" Padding="10,4" Margin="0,0,6,0" Click="StepMoveUp_Click"/>
+                            <Button Content="Move Down" Padding="10,4" Margin="0,0,6,0" Click="StepMoveDown_Click"/>
+                            <Button Content="Clear All" Padding="10,4" Margin="0,0,6,0" Click="StepClear_Click"/>
+                            <Separator Background="#CCCCCC" Width="1" Margin="8,2"/>
+                            <CheckBox x:Name="RawEditCheck" Content="Edit raw script" VerticalAlignment="Center"
+                                      Margin="0,0,8,0" Checked="RawEditCheck_Changed" Unchecked="RawEditCheck_Changed"/>
+                            <TextBlock Text="Double-click a step to edit its parameters." Foreground="#999" FontSize="11" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- Generated script -->
+                    <GroupBox Grid.Row="3" Header="Generated action script" Margin="6,4,6,6">
+                        <TextBox x:Name="ActionScriptBox" AcceptsReturn="True" TextWrapping="NoWrap"
+                                 FontFamily="Consolas" FontSize="12" Padding="4"
+                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                 IsReadOnly="True"/>
+                    </GroupBox>
                 </Grid>
             </TabItem>
             <TabItem Header="Success criteria">
@@ -211,6 +328,280 @@
             <TabItem Header="XML preview">
                 <RichTextBox x:Name="XmlPreviewBox" FontFamily="Consolas" FontSize="12"
                              Padding="4" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+            </TabItem>
+            <TabItem Header="Analysis">
+                <Grid Margin="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="180"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Step buttons (same pattern as Patch Factory) -->
+                    <DockPanel Grid.Row="0" Margin="0,2,0,6" LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="Template:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <ComboBox x:Name="AnalysisTemplateCombo" Width="190" Height="28"
+                                      VerticalContentAlignment="Center" SelectedIndex="0"/>
+                            <Button Content="Apply Template" Padding="12,6" Margin="8,0,5,0"
+                                    FontWeight="SemiBold" Click="AnalysisApplyTemplateBtn_Click"/>
+                            <Separator Background="#CCCCCC" Width="1" Margin="8,2"/>
+                            <Button Content="Add Property" Padding="12,6" Margin="0,0,5,0"
+                                    Click="AnalysisAddPropertyBtn_Click"/>
+                            <Button Content="Remove" Padding="12,6" Margin="0,0,5,0"
+                                    Click="AnalysisRemovePropertyBtn_Click"/>
+                            <Button Content="Move Up" Padding="10,6" Margin="0,0,5,0"
+                                    Click="AnalysisMoveUpBtn_Click"/>
+                            <Button Content="Move Down" Padding="10,6" Margin="0,0,5,0"
+                                    Click="AnalysisMoveDownBtn_Click"/>
+                            <Separator Background="#CCCCCC" Width="1" Margin="8,2"/>
+                            <Button Content="Validate" Padding="12,6" Margin="0,0,5,0"
+                                    Click="AnalysisValidateBtn_Click"/>
+                            <Button Content="Save As .bes..." Padding="12,6" Margin="0,0,5,0"
+                                    FontWeight="SemiBold" Click="AnalysisSaveBtn_Click"
+                                    ToolTip="Save analysis (Ctrl+S when Analysis tab is active)"/>
+                            <Button x:Name="AnalysisPublishBtn" Content="Publish to BigFix" Padding="12,6"
+                                    Click="AnalysisPublishBtn_Click"
+                                    ToolTip="POST Analysis XML to BigFix REST api/analyses/{site}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="AnalysisWhatIfCheck" Content="What-if" VerticalAlignment="Center"
+                                  Margin="16,0,8,0" DockPanel.Dock="Right"
+                                  ToolTip="Print XML without publishing"/>
+                    </DockPanel>
+
+                    <!-- Fields (WrapPanel like Patch Factory filters) -->
+                    <WrapPanel Grid.Row="1" Margin="0,0,0,6">
+                        <TextBlock Text="Title:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="AnalysisTitleBox" Width="280" Height="28"
+                                 VerticalContentAlignment="Center" TextChanged="AnalysisField_Changed"/>
+                        <TextBlock Text="Category:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                        <TextBox x:Name="AnalysisCategoryBox" Width="140" Height="28"
+                                 VerticalContentAlignment="Center" Text="BESPolicies"
+                                 TextChanged="AnalysisField_Changed"/>
+                        <TextBlock Text="Site:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                        <TextBox x:Name="AnalysisSiteBox" Width="220" Height="28"
+                                 VerticalContentAlignment="Center" Text="Enterprise Windows Patching"/>
+                        <TextBlock Text="Source ID:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                        <TextBox x:Name="AnalysisSourceIdBox" Width="160" Height="28"
+                                 VerticalContentAlignment="Center" TextChanged="AnalysisField_Changed"/>
+                    </WrapPanel>
+
+                    <Grid Grid.Row="2" Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Target relevance (one per line):" Grid.Column="0"
+                                   VerticalAlignment="Top" Margin="0,2,6,0"
+                                   ToolTip="All expressions must be true for a computer to report."/>
+                        <TextBox x:Name="AnalysisRelevanceBox" Grid.Column="0" Margin="0,22,0,0"
+                                 MinHeight="40" AcceptsReturn="True" TextWrapping="Wrap"
+                                 FontFamily="Consolas" FontSize="12" Text="true"
+                                 VerticalScrollBarVisibility="Auto" TextChanged="AnalysisField_Changed"/>
+                        <TextBlock Text="Description (HTML):" Grid.Column="1" Grid.ColumnSpan="2"
+                                   VerticalAlignment="Top" Margin="0,2,6,0" HorizontalAlignment="Left"/>
+                        <TextBox x:Name="AnalysisDescriptionBox" Grid.Column="2" Margin="0,22,0,0"
+                                 MinHeight="40" AcceptsReturn="True" TextWrapping="Wrap"
+                                 FontFamily="Consolas" FontSize="11"
+                                 VerticalScrollBarVisibility="Auto" TextChanged="AnalysisField_Changed"/>
+                    </Grid>
+
+                    <!-- Properties toolbar -->
+                    <DockPanel Grid.Row="3" Margin="0,4,0,4" LastChildFill="False"
+                               VerticalAlignment="Top">
+                        <TextBlock Text="Analysis properties" FontWeight="SemiBold" FontSize="14"
+                                   VerticalAlignment="Center" DockPanel.Dock="Left" Margin="2,0,12,0"/>
+                        <TextBlock x:Name="AnalysisPropCountText" Text="0" VerticalAlignment="Center"
+                                   Foreground="#666666" FontSize="12" DockPanel.Dock="Right" Margin="0,0,4,0"/>
+                        <TextBlock Text="Double-click a row to edit Name / Relevance / EvaluationPeriod"
+                                   Foreground="#999" FontSize="11" VerticalAlignment="Center"
+                                   DockPanel.Dock="Right"/>
+                    </DockPanel>
+
+                    <!-- Large property grid (star row, same as Patch Factory) -->
+                    <Border Grid.Row="3" Margin="0,32,0,0" BorderBrush="#CCCCCC"
+                            BorderThickness="1" CornerRadius="4" Background="White">
+                        <DataGrid x:Name="AnalysisPropsGrid" AutoGenerateColumns="False"
+                                  CanUserAddRows="False" HeadersVisibility="Column"
+                                  SelectionMode="Single" SelectionChanged="AnalysisPropsGrid_SelectionChanged"
+                                  MouseDoubleClick="AnalysisPropsGrid_MouseDoubleClick"
+                                  FontSize="14" RowHeight="34" ColumnHeaderHeight="36"
+                                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="220"/>
+                                <DataGridTextColumn Header="Relevance" Binding="{Binding Relevance}" Width="*"/>
+                                <DataGridTextColumn Header="EvaluationPeriod" Binding="{Binding EvaluationPeriod}" Width="130"/>
+                                <DataGridCheckBoxColumn Header="Stats" Binding="{Binding KeepStatistics}" Width="60"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <!-- Snippets (Auto row) -->
+                    <WrapPanel Grid.Row="4" Background="#F0F0F0" Margin="4,6,4,4">
+                        <TextBlock Text="Quick property snippets:" VerticalAlignment="Center"
+                                   FontWeight="SemiBold" Margin="4,0,8,0"/>
+                        <Button Content="OS name" Padding="8,3" Margin="2" Click="AnalysisSnippetBtn_Click"
+                                Tag="name of operating system"/>
+                        <Button Content="Client version" Padding="8,3" Margin="2" Click="AnalysisSnippetBtn_Click"
+                                Tag="version of client"/>
+                        <Button Content="Computer name" Padding="8,3" Margin="2" Click="AnalysisSnippetBtn_Click"
+                                Tag="name of computer"/>
+                        <Button Content="Free disk GB" Padding="8,3" Margin="2" Click="AnalysisSnippetBtn_Click"
+                                Tag="((free space of drive &quot;c:&quot;) / (1024*1024*1024)) as fixed decimal with 1 decimal place as string"/>
+                        <Button Content="Reg DisplayVersion" Padding="8,3" Margin="2" Click="AnalysisSnippetBtn_Click"
+                                Tag="(value &quot;DisplayVersion&quot; of it as string) of key &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall&quot; of native registry | &quot;Not Installed&quot;"/>
+                        <Button Content="Regapp version" Padding="8,3" Margin="2" Click="AnalysisSnippetBtn_Click"
+                                Tag="if exists regapp &quot;chrome.exe&quot; then version of regapp &quot;chrome.exe&quot; as string else &quot;Not Installed&quot;"/>
+                        <Button Content="App DisplayVersion" Padding="8,3" Margin="2" Click="AnalysisSnippetBtn_Click"
+                                Tag="unique values of ((values &quot;DisplayVersion&quot; of it as string) of keys whose (value &quot;DisplayName&quot; of it as string as lowercase contains &quot;google chrome&quot;) of key &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall&quot; of native registry) | &quot;Not Installed&quot;"/>
+                    </WrapPanel>
+
+                    <!-- Live XML preview (fixed bottom row like Action Builder script) -->
+                    <GroupBox Grid.Row="5" Header="Generated Analysis BES XML (live preview)" Margin="0,4,0,0">
+                        <TextBox x:Name="AnalysisXmlPreviewBox" AcceptsReturn="True" TextWrapping="NoWrap"
+                                 FontFamily="Consolas" FontSize="12" Padding="4"
+                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                 IsReadOnly="True"/>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Patch Factory">
+                <Grid Margin="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Compact step buttons -->
+                    <DockPanel Grid.Row="0" Margin="0,2,0,6" LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <Button x:Name="PatchDiscoverBtn" Content="1 Discover" Padding="12,6" Margin="0,0,5,0"
+                                    FontWeight="SemiBold" Click="PatchDiscoverBtn_Click"/>
+                            <Button x:Name="PatchValidateBtn" Content="2 Validate" Padding="12,6" Margin="0,0,5,0"
+                                    Click="PatchValidateBtn_Click"/>
+                            <Button x:Name="PatchGenerateBtn" Content="3 Generate .bes" Padding="12,6" Margin="0,0,5,0"
+                                    Click="PatchGenerateBtn_Click"/>
+                            <Button x:Name="PatchTaskBtn" Content="Tasks" Padding="10,6" Margin="0,0,5,0"
+                                    Click="PatchTaskBtn_Click"/>
+                            <Separator Background="#CCCCCC" Width="1" Margin="8,2"/>
+                            <Button x:Name="PatchPublishBtn" Content="4 Publish" Padding="12,6" Margin="0,0,5,0"
+                                    Click="PatchPublishBtn_Click"
+                                    ToolTip="POST BES XML to BigFix REST API (dedupe by KB)"/>
+                            <Button x:Name="PatchGroupsBtn" Content="5 Groups" Padding="12,6" Margin="0,0,5,0"
+                                    Click="PatchGroupsBtn_Click"
+                                    ToolTip="Create Microsoft Patches/{cycle}/Pilot|Wave 1.. hierarchy"/>
+                            <Button x:Name="PatchDeployBtn" Content="6 Deploy" Padding="12,6" Margin="0,0,5,0"
+                                    Click="PatchDeployBtn_Click"
+                                    ToolTip="Start staged action for selected stage"/>
+                            <Button x:Name="PatchComplianceBtn" Content="7 Compliance" Padding="12,6" Margin="0,0,5,0"
+                                    Click="PatchComplianceBtn_Click"/>
+                            <Separator Background="#CCCCCC" Width="1" Margin="8,2"/>
+                            <Button x:Name="PatchCycleBtn" Content="Run full cycle" Padding="12,6" Margin="0,0,5,0"
+                                    FontWeight="SemiBold" Click="PatchCycleBtn_Click"
+                                    ToolTip="Discover + Validate + Generate for Patch Tuesday"/>
+                            <Button x:Name="PatchOpenFolderBtn" Content="Open output" Padding="12,6" Margin="0,0,0,0"
+                                    Click="PatchOpenFolderBtn_Click"/>
+                        </StackPanel>
+                        <CheckBox x:Name="PatchWhatIfCheck" Content="What-if" VerticalAlignment="Center"
+                                  Margin="16,0,8,0" DockPanel.Dock="Right"
+                                  ToolTip="Preview publish/deploy without changing BigFix"/>
+                        <CheckBox x:Name="PatchDownloadCheck" Content="Download hashes" VerticalAlignment="Center"
+                                  Margin="8,0,0,0" DockPanel.Dock="Right"
+                                  ToolTip="Download installers during validate to verify size/SHA256"/>
+                    </DockPanel>
+
+                    <!-- Filters -->
+                    <WrapPanel Grid.Row="1" Margin="0,0,0,6">
+                        <TextBlock Text="KB(s):" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="PatchKbBox" Width="180" Height="28" VerticalContentAlignment="Center"
+                                 ToolTip="Comma-separated, e.g. KB5071234,KB5075678"/>
+                        <TextBlock Text="Query:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                        <TextBox x:Name="PatchQueryBox" Width="200" Height="28" VerticalContentAlignment="Center"
+                                 ToolTip="Free-text Microsoft Update Catalog query"/>
+                        <TextBlock Text="Product:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                        <TextBox x:Name="PatchProductBox" Width="160" Height="28" VerticalContentAlignment="Center"
+                                 ToolTip="e.g. Windows 11 23H2"/>
+                        <TextBlock Text="Arch:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                        <ComboBox x:Name="PatchArchCombo" Width="80" Height="28" VerticalContentAlignment="Center">
+                            <ComboBoxItem Content="x64" IsSelected="True"/>
+                            <ComboBoxItem Content="x86"/>
+                            <ComboBoxItem Content="arm64"/>
+                        </ComboBox>
+                        <CheckBox x:Name="PatchWin10Check" Content="Win10" VerticalAlignment="Center"
+                                  Margin="14,0,0,0" IsChecked="True"
+                                  ToolTip="Auto-scan Windows 10 releases this month"/>
+                        <CheckBox x:Name="PatchWin11Check" Content="Win11" VerticalAlignment="Center"
+                                  Margin="8,0,0,0" IsChecked="True"
+                                  ToolTip="Auto-scan Windows 11 releases this month"/>
+                        <CheckBox x:Name="PatchTuesdayCheck" Content="Whole month" VerticalAlignment="Center"
+                                  Margin="14,0,0,0" IsChecked="True"
+                                  ToolTip="Scan all catalog security/cumulative updates since Patch Tuesday (-1 day)"/>
+                        <TextBlock Text="Output:" VerticalAlignment="Center" Margin="14,0,6,0"/>
+                        <TextBox x:Name="PatchOutputBox" Width="200" Height="28" VerticalContentAlignment="Center"
+                                 Text="./patch-output"/>
+                        <TextBlock Text="Site:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                        <TextBox x:Name="PatchSiteBox" Width="200" Height="28" VerticalContentAlignment="Center"
+                                 Text="Enterprise Windows Patching"/>
+                        <TextBlock Text="Stage:" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                        <ComboBox x:Name="PatchStageCombo" Width="90" Height="28" VerticalContentAlignment="Center">
+                            <ComboBoxItem Content="pilot" IsSelected="True"/>
+                            <ComboBoxItem Content="wave1"/>
+                            <ComboBoxItem Content="wave2"/>
+                            <ComboBoxItem Content="wave3"/>
+                        </ComboBox>
+                    </WrapPanel>
+
+                    <!-- Grid toolbar -->
+                    <DockPanel Grid.Row="2" Margin="0,0,0,4" LastChildFill="False">
+                        <TextBlock Text="Discovered patches" FontWeight="SemiBold" FontSize="14"
+                                   VerticalAlignment="Center" DockPanel.Dock="Left" Margin="2,0,12,0"/>
+                        <TextBlock x:Name="PatchCountText" Text="0" VerticalAlignment="Center"
+                                   Foreground="#666666" FontSize="12" DockPanel.Dock="Right" Margin="0,0,4,0"/>
+                        <TextBlock Text="Filter:" VerticalAlignment="Center" DockPanel.Dock="Right" Margin="0,0,6,0"/>
+                        <TextBox x:Name="PatchFilterBox" Width="240" Height="28" VerticalContentAlignment="Center"
+                                 DockPanel.Dock="Right" TextChanged="PatchFilterBox_TextChanged"
+                                 ToolTip="Filter grid by KB, title, or product"/>
+                    </DockPanel>
+
+                    <!-- Large patch grid -->
+                    <Border Grid.Row="3" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4" Background="White">
+                        <DataGrid x:Name="PatchGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                                  CanUserAddRows="False" HeadersVisibility="Column" SelectionMode="Single"
+                                  SelectionChanged="PatchGrid_SelectionChanged"
+                                  FontSize="14" RowHeight="34" ColumnHeaderHeight="36"
+                                  EnableRowVirtualization="False"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="KB" Binding="{Binding Kb}" Width="130"/>
+                                <DataGridTextColumn Header="Product" Binding="{Binding Product}" Width="220"/>
+                                <DataGridTextColumn Header="Arch" Binding="{Binding Architecture}" Width="80"/>
+                                <DataGridTextColumn Header="Released" Binding="{Binding ReleaseDate, StringFormat=yyyy-MM-dd}" Width="120"/>
+                                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="110"/>
+                                <DataGridTextColumn Header="Reboot" Binding="{Binding RebootRequired}" Width="90"/>
+                                <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*"/>
+                                <DataGridTextColumn Header="BES" Binding="{Binding GeneratedBesPath}" Width="240"/>
+                                <DataGridTextColumn Header="Published" Binding="{Binding PublishedId}" Width="110"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <!-- Compact log -->
+                    <Expander Grid.Row="4" x:Name="PatchLogExpander" Header="Pipeline log" IsExpanded="False"
+                              Margin="0,6,0,0" MaxHeight="200">
+                        <TextBox x:Name="PatchLogBox" AcceptsReturn="True" TextWrapping="Wrap" IsReadOnly="True"
+                                 FontFamily="Consolas" FontSize="12" Padding="6" MinHeight="100" MaxHeight="160"
+                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+                    </Expander>
+                </Grid>
             </TabItem>
             <TabItem Header="Command Reference (F1)">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

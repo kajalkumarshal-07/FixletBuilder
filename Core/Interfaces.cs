@@ -3,7 +3,9 @@ namespace FixletBuilder.Core;
 public interface IInstalledAppsScanner
 {
     List<InstalledApp> Scan();
-    Task<List<InstalledApp>> ScanAsync(IProgress<int>? progress = null, CancellationToken ct = default);
+    /// <summary>enrichWithWinget=false reads only the registry (fast, no winget call).</summary>
+    Task<List<InstalledApp>> ScanAsync(IProgress<int>? progress = null, CancellationToken ct = default,
+        bool enrichWithWinget = true);
 }
 
 public interface IWingetIntegration
@@ -32,6 +34,14 @@ public interface IFixletWriter
     void WriteBes(string filePath, FixletModel model);
     void WriteJson(string filePath, FixletModel model);
     string GenerateXml(FixletModel model);
+}
+
+public interface IAnalysisWriter
+{
+    string GenerateXml(AnalysisModel model);
+    void WriteBes(string filePath, AnalysisModel model);
+    void WriteJson(string filePath, AnalysisModel model);
+    List<string> Validate(AnalysisModel model);
 }
 
 public interface IDownloadService

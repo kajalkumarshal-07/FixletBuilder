@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace FixletBuilder.Core;
 
 public static class ActionScriptCommands
@@ -555,6 +557,66 @@ public static class ActionScriptCommands
 
     public static List<string> Categories => new() { "All", "Download", "Execution", "Flow Control", "File", "Registry", "Client", "Site", "Agent2Agent" };
 
+    /// <summary>
+    /// Derive a valid prefetch download file name from a URL (falls back to appName).
+    /// Prefetch names: &lt;=32 chars, a-zA-Z0-9-_ and non-leading periods.
+    /// </summary>
+    public static string DeriveDownloadFileName(string? url, string? appName = null)
+    {
+        var name = "";
+        if (!string.IsNullOrWhiteSpace(url))
+        {
+            try
+            {
+                var uri = new Uri(url);
+                name = Path.GetFileName(uri.LocalPath);
+            }
+            catch
+            {
+                // ignore malformed URL
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = string.IsNullOrWhiteSpace(appName) ? "installer" : appName;
+            if (!name.Contains('.'))
+                name += ".exe";
+        }
+
+        // Sanitize for prefetch: replace invalid chars, collapse whitespace
+        var sb = new System.Text.StringBuilder(name.Length);
+        foreach (var c in name)
+        {
+            bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                      c == '-' || c == '_' || c == '.';
+            sb.Append(ok ? c : '_');
+        }
+        name = sb.ToString().Trim('.', '_');
+        if (name.Length == 0) name = "installer.exe";
+        if (name.Length > 32)
+        {
+            var ext = Path.GetExtension(name);
+            if (ext.Length > 8) ext = "";
+            name = name[..(32 - ext.Length)] + ext;
+        }
+        if (name.StartsWith('.')) name = "_" + name[1..];
+        return name;
+    }
+
+    public static bool IsMsiUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        try
+        {
+            return Path.GetFileName(new Uri(url).LocalPath).EndsWith(".msi", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return url.Contains(".msi", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     public static class Snippets
     {
         public static string KillProcess(string processName)
@@ -725,6 +787,61 @@ public static class ActionScriptCommands
         public static string ActionUnlock()
         {
             return "action unlock \"{now}\"";
+        }
+
+        public static string InstallDownloaded(string fileName, string silentArgs, string url)
+        {
+            if (string.IsNullOrWhiteSpace(silentArgs))
+                silentArgs = IsMsiUrl(url) ? "/qn" : "/S";
+
+            if (IsMsiUrl(url))
+                return $"waithidden msiexec.exe /i \"{{pathname of download file \"{fileName}\"}}\" {silentArgs}".TrimEnd();
+            return $"waithidden \"{{pathname of download file \"{fileName}\"}}\" {silentArgs}".TrimEnd();
+        }
+
+        public static string InstallLocal(string installPath, string silentArgs)
+        {
+            if (string.IsNullOrWhiteSpace(installPath)) return "// TODO: install command";
+            var isMsi = installPath.EndsWith(".msi", StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(silentArgs))
+                silentArgs = isMsi ? "/qn" : "/S";
+            if (isMsi)
+                return $"waithidden msiexec.exe /i \"{installPath}\" {silentArgs}".TrimEnd();
+            return $"waithidden \"{installPath}\" {silentArgs}".TrimEnd();
+        }
+
+        public static string BuildRunCommand(string command, string args)
+        {
+            if (string.IsNullOrWhiteSpace(command)) return "";
+            if (string.IsNullOrWhiteSpace(args)) return $"waithidden {command}";
+            // If command already contains args (quoted path + switches), just append
+            return $"waithidden {command} {args}".TrimEnd();
+        }
+
+        public static string SilentArgsForUninstall(string uninstallString)
+        {
+            if (string.IsNullOrWhiteSpace(uninstallString)) return "";
+            var u = uninstallString.ToLowerInvariant();
+            if (u.Contains("msiexec"))
+                return "/qn";
+            return "/S";
+        }
+
+        public static string Prefetch(string fileName, string sha1, string sha256, string fileSize, string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return "// prefetch: installer URL missing";
+            if (string.IsNullOrWhiteSpace(sha1) && string.IsNullOrWhiteSpace(sha256))
+                return "// prefetch: SHA1/SHA256 missing - click Fetch Hashes first";
+
+            var line = $"prefetch {fileName}";
+            if (!string.IsNullOrWhiteSpace(sha1))
+                line += $" sha1:{sha1}";
+            if (!string.IsNullOrWhiteSpace(fileSize) && fileSize != "0")
+                line += $" size:{fileSize}";
+            line += $" {url}";
+            if (!string.IsNullOrWhiteSpace(sha256))
+                line += $" sha256:{sha256}";
+            return line;
         }
     }
 }

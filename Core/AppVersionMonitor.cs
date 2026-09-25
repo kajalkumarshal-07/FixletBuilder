@@ -154,7 +154,13 @@ public sealed class AppVersionMonitor : IAppVersionMonitor
                 installPath,
                 "");
 
-            var relevance = RelevanceBuilder.BuildForUpgrade(installPath, r.AppName, r.InstalledVersion, r.LatestVersion);
+            var detection = RelevanceBuilder.BuildDetection(new DetectionInput
+            {
+                Type = type,
+                AppName = r.AppName,
+                Version = r.LatestVersion,
+                InstallPath = installPath
+            });
 
             fixlets.Add(new FixletModel
             {
@@ -162,11 +168,11 @@ public sealed class AppVersionMonitor : IAppVersionMonitor
                 Category = "Applications",
                 Source = "FixletBuilder AutoMonitor",
                 SourceId = r.PackageId,
-                Relevance = relevance,
+                Relevance = detection.Relevance,
                 Description = template.Description,
                 ActionDescription = template.ActionDescription,
                 ActionScript = template.ActionScript,
-                SuccessCriteria = RelevanceBuilder.BuildSuccessCriteria(installPath, type, r.LatestVersion)
+                SuccessCriteria = detection.SuccessCriteria
             });
         }
 
